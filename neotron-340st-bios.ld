@@ -21,10 +21,14 @@
 /* Provides information about the memory layout of the device */
 MEMORY
 {
-    /* The BIOS gets the first 128 KiB of Flash, leaving 128 KiB for the OS */
-    FLASH (rx)  : ORIGIN = 0x00000000, LENGTH = 128K
-    /* The BIOS gets the top 6 KiB of SRAM (including the Stack), leaving 26 KiB for the OS (at 0x2000_0000 to 0x2000_67FF) */
-    RAM   (rwx) : ORIGIN = 0x20006800, LENGTH = 6K
+    /* The BIOS gets the first 512 KiB of Flash, leaving 512 KiB for the OS */
+    FLASH (rx)  : ORIGIN = 0x00080000, LENGTH = 512K
+    /* The BIOS gets the top 64 KiB of SRAM (including the Stack), leaving 256 KiB for the OS
+       (at 0x2000_0000 to 0x2003_FFFF). The RAM is actually split into three banks, but we can
+       largely ignore that.
+    */
+    RAM   (rwx) : ORIGIN = 0x20040000, LENGTH = 64K
+    /* The SDRAM holds the LCD framebuffers */
 }
 
 /* # Entry point = reset vector */

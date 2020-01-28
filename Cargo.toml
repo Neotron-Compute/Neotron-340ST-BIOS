@@ -19,9 +19,9 @@ debug = true
 codegen-units = 1
 opt-level = "s"
 
-[dependencies.tm4c123x-hal]
-version = "0.10"
-features = ["rt"]
+[dependencies.stm32f7xx-hal]
+version = "0.1.0"
+features = ["rt", "stm32f746"]
 
 [dependencies.embedded-hal]
 version = "0.2"

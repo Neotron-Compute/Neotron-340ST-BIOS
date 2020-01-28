@@ -28,7 +28,7 @@ This BIOS is a work in progress. Bits of the Neotron 32 firmware will be ported 
 
 ## Memory Map
 
-The Neotron 340ST has 1024 KiB of Flash and 340 KiB of internal SRAM. There is also a 16 MiB external NOR Flash, and an external 8 MiB SDRAM on the Discovery PCB, which are currently unused. The Flash layout is:
+The Neotron 340ST has 1024 KiB of Flash and 340 KiB of internal SRAM. There is also a 16 MiB external NOR Flash, which is unused at the moment, and an external 8 MiB SDRAM which is used as VRAM. The Flash layout is:
 
 * First 512 KiB of Flash for the BIOS
 * Next 256 KiB of Flash for the OS
