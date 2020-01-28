@@ -1,0 +1,8 @@
+[target.thumbv7em-none-eabihf]
+runner = 'arm-none-eabi-gdb --command=gdb.cfg -w'
+rustflags = [
+  "-C", "link-arg=-TNeotron-340ST-bios.ld",
+]
+
+[build]
+target = "thumbv7em-none-eabihf"
