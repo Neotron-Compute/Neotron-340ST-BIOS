@@ -62,20 +62,29 @@ use core::fmt::Write;
 use core::panic::PanicInfo;
 use core::sync::atomic::{self, Ordering};
 use cortex_m_rt::entry;
-use embedded_sdmmc as sdmmc;
-use stm32f7xx_hal::device as hal;
-
+use hal::{
+	device,
+	prelude::*,
+	serial::{self, Serial},
+};
+use nb::block;
 use neotron_common_bios as common;
+use stm32f7xx_hal as hal;
 
 // ===========================================================================
 // Types
 // ===========================================================================
 
+type AF7 = hal::gpio::Alternate<hal::gpio::AF7>;
+
 /// This holds our system state - all our HAL drivers, etc.
 #[allow(dead_code)]
 pub struct BoardInner {
-	/// Placeholder
-	placeholder: (),
+	/// USB Virtual COM-Port. Connect the USB mini-B connector to your PC to view.
+	usb_uart: hal::serial::Serial<
+		device::USART1,
+		(hal::gpio::gpioa::PA9<AF7>, hal::gpio::gpiob::PB7<AF7>),
+	>,
 }
 
 // ===========================================================================
@@ -113,18 +122,55 @@ static GLOBAL_BOARD: spin::Mutex<Option<BoardInner>> = spin::Mutex::new(None);
 // Public Functions
 // ===========================================================================
 
+impl core::fmt::Write for BoardInner {
+	fn write_str(&mut self, s: &str) -> core::fmt::Result {
+		for b in s.bytes() {
+			block!(self.usb_uart.write(b)).unwrap();
+		}
+		Ok(())
+	}
+}
+
 /// Entry point to the BIOS. This is called from the reset vector by
 /// `cortex-m-rt`.
 #[entry]
 fn main() -> ! {
 	// Grab the singletons
-	let p = hal::Peripherals::take().unwrap();
+	let p = device::Peripherals::take().unwrap();
+	// Reset and Clock Controller
+	let rcc = p.RCC.constrain();
+	// Full speed ahead!
+	let clocks = rcc.cfgr.sysclk(216.mhz()).freeze();
+	// Get the GPIO objects
+	let gpioa = p.GPIOA.split();
+	let gpiob = p.GPIOB.split();
+	// VCP UART is on PB7 (VCP RX) and PA9 (VCP TX).
+	let tx = gpioa.pa9.into_alternate_af7();
+	let rx = gpiob.pb7.into_alternate_af7();
+	// Construct a serial port
+	let usb_uart = Serial::new(
+		p.USART1,
+		(tx, rx),
+		clocks,
+		serial::Config {
+			baud_rate: 115_200.bps(),
+			oversampling: serial::Oversampling::By16,
+		},
+	);
 
-	let mut board = BoardInner { placeholder: () };
+	let mut board = BoardInner { usb_uart };
+
+	// Say hello to the nice users.
+	writeln!(
+		board,
+		"{} booting...",
+		&BIOS_VERSION[..BIOS_VERSION.len() - 1]
+	)
+	.unwrap();
 
 	*GLOBAL_BOARD.lock() = Some(board);
 
-	let code: &common::OsStartFn = unsafe { ::core::mem::transmute(0x0008_0000) };
+	let code: &common::OsStartFn = unsafe { ::core::mem::transmute(0x0808_0000) };
 
 	code(&API_CALLS);
 }
@@ -167,12 +213,23 @@ pub extern "C" fn serial_write(
 	_timeout: common::Option<common::Timeout>,
 ) -> common::Result<usize> {
 	if let Some(ref mut board) = *crate::GLOBAL_BOARD.lock() {
+		// TODO: Add a timer to the board and use it to handle the timeout.
+		// Match on the result of write:
+		// * if we get an error, return it.
+		// * if we get a WouldBlock, spin (or WFI?).
+		// * if we get Ok, carry on.
 		let data = data.as_slice();
 		match device {
+			0 => {
+				for b in data.iter().cloned() {
+					block!(board.usb_uart.write(b)).unwrap();
+				}
+			}
 			_ => {
 				return common::Result::Err(common::Error::InvalidDevice);
 			}
 		}
+		common::Result::Ok(data.len())
 	} else {
 		panic!("HW Lock fail");
 	}
